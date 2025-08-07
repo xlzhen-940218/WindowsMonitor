@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>系统性能监控</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-color: #111827;
+            --card-color: #1f2937;
+            --text-color: #e5e7eb;
+            --text-secondary: #9ca3af;
+            --accent-color: #3b82f6;
+            --red: #ef4444;
+            --green: #22c55e;
+            --yellow: #eab308;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100%;
+            overflow: hidden;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding: 0.5rem;
+            gap: 0.5rem;
+            flex: 1;
+        }
+        .dashboard {
+            flex-grow: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr;
+            gap: 0.5rem;
+            overflow: hidden;
+            min-height: 0;
+        }
+        .left-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 0.5rem;
+            min-height: 0;
+        }
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            min-height: 0;
+        }
+        .card {
+            background-color: var(--card-color);
+            border-radius: 0.5rem;
+            padding: 0.6rem;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.4rem;
+            flex-shrink: 0;
+        }
+        .card-title { font-weight: 600; font-size: 0.8rem; }
+        .card-value { font-size: 1rem; font-weight: bold; }
+        .card-content { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.3rem; min-height: 0; }
+        .stat-line { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; }
+        .progress-bar { width: 100%; height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; }
+        .progress { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+
+        /* --- Specific Card Styles --- */
+        .cpu .progress { background-color: var(--red); }
+        .mem .progress { background-color: var(--accent-color); }
+        #cpu-cores {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            min-height: 0;
+            overflow-y: auto;
+        }
+        .core-progress {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+        .core-progress span {
+            font-size: 0.8rem;
+        }
+        .core-progress .progress-bar {
+            width: 100%;
+        }
+        #disk-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            min-height: 0;
+            overflow-y: auto;
+        }
+
+        .processes {
+            flex-grow: 1;
+            height: 90%;
+            overflow-y: hidden;
+        }
+        .proc-list {
+            list-style: none;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            overflow-y: auto;
+            flex-grow: 1;
+            height: 30rem;
+        }
+        .proc-item { display: grid; grid-template-columns: 1fr 3rem 3rem 2rem; gap: 0.4rem; align-items: center; padding: 2px 0; }
+        .proc-header { font-weight: bold; color: var(--text-color); }
+
+        .kill-btn {
+            background-color: var(--red);
+            color: white;
+            border: none;
+            border-radius: 0.3rem;
+            width: 2rem;
+            height: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            transition: background-color 0.2s;
+        }
+        .kill-btn:hover { background-color: #ff7676; }
+        .kill-btn i {
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="dashboard">
+        <div class="left-panel">
+            <div class="card cpu">
+                <div class="card-header">
+                    <span class="card-title"><i class="fas fa-microchip"></i> CPU</span>
+                </div>
+                <div class="card-content">
+                    <div id="cpu-cores"></div>
+                </div>
+            </div>
+            <div class="card mem">
+                <div class="card-header"><span class="card-title"><i class="fas fa-memory"></i> 内存</span></div>
+                <div class="card-content">
+                    <div class="progress-bar"><div class="progress" id="mem-progress"></div></div>
+                    <div class="stat-line" style="margin-top: 0.3rem;"><span>使用率:</span><span id="mem-percent" class="card-value" style="color: var(--accent-color)">--%</span></div>
+                </div>
+            </div>
+            <div class="card disk">
+                <div class="card-header"><span class="card-title"><i class="fas fa-hdd"></i> 磁盘</span></div>
+                <div class="card-content" id="disk-list"></div>
+            </div>
+            <div class="card network">
+                <div class="card-header"><span class="card-title"><i class="fas fa-network-wired"></i> 网络</span></div>
+                <div class="card-content">
+                    <div class="stat-line"><span><i class="fas fa-arrow-up" style="color:var(--yellow)"></i> 上传:</span> <span id="net-upload">-- KB/s</span></div>
+                    <div class="stat-line"><span><i class="fas fa-arrow-down" style="color:var(--green)"></i> 下载:</span> <span id="net-download">-- KB/s</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="right-panel">
+            <div class="card processes">
+                <div class="card-header"><span class="card-title"><i class="fas fa-tasks"></i> 进程资源占用</span></div>
+                <ul class="proc-list" id="proc-list">
+                    <li class="proc-item proc-header"><span>进程名</span><span>CPU%</span><span>内存%</span><span></span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const GIGA = 1024 ** 3;
+
+    function formatSpeed(bytesPerSecond) {
+        if (bytesPerSecond < 1024) return `${bytesPerSecond.toFixed(0)} B/s`;
+        const kbs = bytesPerSecond / 1024;
+        if (kbs < 1024) return `${kbs.toFixed(1)} KB/s`;
+        const mbs = kbs / 1024;
+        return `${mbs.toFixed(2)} MB/s`;
+    }
+
+    async function killProcess(pid, name) {
+        if (!confirm(`确实要结束进程 ${pid} (${name}) 吗？\n警告：结束系统关键进程可能导致系统不稳定！`)) {
+            return;
+        }
+        try {
+            const response = await fetch('/api/kill_process', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pid: pid })
+            });
+            const result = await response.json();
+            alert(result.message);
+            if (result.success) {
+                fetchDataAndUpdateUI();
+            }
+        } catch (error) {
+            console.error('Failed to kill process:', error);
+            alert('结束进程失败，详见控制台。');
+        }
+    }
+
+    async function fetchDataAndUpdateUI() {
+        try {
+            const response = await fetch('/api/data');
+            if (!response.ok) throw new Error('Network response was not ok');
+            const data = await response.json();
+
+            // --- CPU ---
+            const cpuCoresDiv = document.getElementById('cpu-cores');
+            cpuCoresDiv.innerHTML = '';
+            data.cpu.top_cores.forEach(core => {
+                const coreUsage = core[1].toFixed(1);
+                cpuCoresDiv.innerHTML += `
+                    <div class="core-progress">
+                        <span>核心 ${core[0]}: ${coreUsage}%</span>
+                        <div class="progress-bar">
+                            <div class="progress" style="width: ${coreUsage}%; background-color: var(--red);"></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // --- Memory ---
+            const memPercent = data.memory.percent.toFixed(1);
+            document.getElementById('mem-percent').textContent = `${memPercent}%`;
+            document.getElementById('mem-progress').style.width = `${memPercent}%`;
+
+            // --- Disks ---
+            const diskListDiv = document.getElementById('disk-list');
+            diskListDiv.innerHTML = '';
+            data.disks.forEach(disk => {
+                diskListDiv.innerHTML += `
+                    <div class="stat-line">
+                        <span>${disk.drive}:</span>
+                        <span>${(disk.used / GIGA).toFixed(1)}/${(disk.total / GIGA).toFixed(1)} GB</span>
+                        <span>${disk.percent.toFixed(1)}%</span>
+                    </div>
+                    <div class="progress-bar"><div class="progress" style="width: ${disk.percent}%; background-color: var(--green);"></div></div>
+                `;
+            });
+
+            // --- Network ---
+            document.getElementById('net-upload').textContent = formatSpeed(data.network.upload_speed);
+            document.getElementById('net-download').textContent = formatSpeed(data.network.download_speed);
+
+
+
+
+
+            // --- Processes ---
+            const procList = document.getElementById('proc-list');
+            while (procList.children.length > 1) {
+                procList.removeChild(procList.lastChild);
+            }
+            data.processes.forEach(p => {
+                const item = document.createElement('li');
+                item.className = 'proc-item';
+                const name = p.name.length > 20 ? p.name.substring(0, 18) + '...' : p.name;
+                item.innerHTML = `
+                    <span title="${p.name}">${name}</span>
+                    <span>${(p.cpu_percent || 0).toFixed(1)}</span>
+                    <span>${(p.memory_percent || 0).toFixed(1)}</span>
+                    <button class="kill-btn" onclick="killProcess(${p.pid}, '${p.name}')"><i class="fas fa-trash"></i></button>
+                `;
+                procList.appendChild(item);
+            });
+
+        } catch (error) {
+            console.error('Failed to fetch system data:', error);
+        }
+    }
+
+    fetchDataAndUpdateUI();
+    setInterval(fetchDataAndUpdateUI, 2000);
+</script>
+</body>
+</html>

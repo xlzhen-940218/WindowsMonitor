@@ -1,0 +1,726 @@
+
+    <!DOCTYPE html>
+    <html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Windows性能监控仪表板</title>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+
+            body {
+                background: linear-gradient(135deg, #1a2a6c, #2c3e50);
+                color: #fff;
+                height: 100vh;
+                overflow: hidden;
+                padding: 15px;
+            }
+
+            .container {
+                display: flex;
+                flex-direction: column;
+                height: calc(100vh - 30px);
+                max-width: 1920px;
+                margin: 0 auto;
+            }
+
+            header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 10px 0;
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+                margin-bottom: 10px;
+                height: 70px;
+                flex-shrink: 0;
+            }
+
+            .header-info {
+                display: flex;
+                gap: 25px;
+            }
+
+            .info-item {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .info-value {
+                font-size: 1.1rem;
+                font-weight: bold;
+                color: #4dabf7;
+            }
+
+            .info-label {
+                font-size: 0.8rem;
+                opacity: 0.7;
+            }
+
+            h1 {
+                font-size: 1.6rem;
+                margin-bottom: 3px;
+                color: #ffd43b;
+            }
+
+            .subtitle {
+                font-size: 0.85rem;
+                opacity: 0.8;
+            }
+
+            .dashboard {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                grid-template-rows: repeat(3, 1fr);
+                gap: 15px;
+                flex: 1;
+                min-height: 0;
+            }
+
+            .card {
+                background: rgba(30, 41, 59, 0.7);
+                border-radius: 12px;
+                padding: 15px;
+                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+                backdrop-filter: blur(8px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+
+            .card-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 10px;
+                padding-bottom: 8px;
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+            }
+
+            .card-title {
+                font-size: 1.1rem;
+                font-weight: 600;
+            }
+
+            .card-icon {
+                font-size: 1.3rem;
+                color: #4dabf7;
+            }
+
+            .stats-container {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                gap: 10px;
+                margin-top: 15px;
+            }
+
+            .stat-card {
+                background: rgba(15, 23, 42, 0.6);
+                border-radius: 8px;
+                padding: 10px;
+                text-align: center;
+                transition: transform 0.3s ease;
+            }
+
+            .stat-card:hover {
+                transform: translateY(-3px);
+                background: rgba(15, 23, 42, 0.8);
+            }
+
+            .stat-value {
+                font-size: 1.4rem;
+                font-weight: bold;
+                margin: 3px 0;
+            }
+
+            .stat-label {
+                font-size: 0.8rem;
+                opacity: 0.8;
+            }
+
+            .progress-bar {
+                height: 6px;
+                background: rgba(255,255,255,0.1);
+                border-radius: 3px;
+                overflow: hidden;
+                margin-top: 8px;
+            }
+
+            .progress {
+                height: 100%;
+                border-radius: 3px;
+            }
+
+            .cpu-progress { background: linear-gradient(90deg, #ff6b6b, #ffa8a8); }
+            .mem-progress { background: linear-gradient(90deg, #4dabf7, #a5d8ff); }
+            .disk-progress { background: linear-gradient(90deg, #51cf66, #94d82d); }
+
+            .chart-container {
+                height: 160px;
+                margin-top: 10px;
+                flex: 1;
+                min-height: 0;
+            }
+
+            .process-list {
+                flex: 1;
+                overflow-y: auto;
+                min-height: 0;
+            }
+
+            .process-item {
+                display: grid;
+                grid-template-columns: 40px 1fr 70px 60px 60px;
+                gap: 12px;
+                padding: 8px 0;
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+                font-size: 0.9rem;
+            }
+
+            .process-header {
+                font-weight: bold;
+                color: #ffd43b;
+                border-bottom: 1px solid rgba(255,255,255,0.2);
+                padding-bottom: 8px;
+                margin-bottom: 5px;
+                position: sticky;
+                top: 0;
+                background: rgba(30, 41, 59, 0.9);
+            }
+
+            .footer {
+                text-align: center;
+                margin-top: 10px;
+                padding-top: 10px;
+                border-top: 1px solid rgba(255,255,255,0.1);
+                font-size: 0.85rem;
+                opacity: 0.7;
+                height: 30px;
+                flex-shrink: 0;
+            }
+
+            /* 特定卡片布局 */
+            .card-cpu {
+                grid-column: 1;
+                grid-row: 1;
+            }
+
+            .card-memory {
+                grid-column: 2;
+                grid-row: 1;
+            }
+
+            .card-disk {
+                grid-column: 1;
+                grid-row: 2;
+            }
+
+            .card-process {
+                grid-column: 2;
+                grid-row: 2;
+            }
+
+            .card-network {
+                grid-column: 1;
+                grid-row: 3;
+            }
+
+            .card-system {
+                grid-column: 2;
+                grid-row: 3;
+            }
+
+            /* 滚动条样式 */
+            ::-webkit-scrollbar {
+                width: 6px;
+            }
+
+            ::-webkit-scrollbar-track {
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 3px;
+            }
+
+            ::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 3px;
+            }
+
+            ::-webkit-scrollbar-thumb:hover {
+                background: rgba(255, 255, 255, 0.3);
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <div>
+                    <h1><i class="fas fa-desktop"></i> Windows性能监控仪表板</h1>
+                    <div class="subtitle">实时系统性能监控 | 最后更新: 2025-08-04 10:07:07</div>
+                </div>
+                <div class="header-info">
+                    <div class="info-item">
+                        <span class="info-label">主机名</span>
+                        <span class="info-value">XLZHEN-PC</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">操作系统</span>
+                        <span class="info-value">Windows-10-10.0.26100-SP0</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">启动时间</span>
+                        <span class="info-value">2025-07-29 16:26:07</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="dashboard">
+                <!-- CPU使用率 -->
+                <div class="card card-cpu">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-microchip"></i> CPU使用率</div>
+                        <div class="card-icon">
+                            <span class="stat-value">8.3%</span>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="cpuChart"></canvas>
+                    </div>
+                    <div class="stats-container">
+                        <div class="stat-card">
+                            <div class="stat-label">核心数量</div>
+                            <div class="stat-value">16</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">最高核心</div>
+                            <div class="stat-value">75.0%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">最低核心</div>
+                            <div class="stat-value">0.0%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 内存使用 -->
+                <div class="card card-memory">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-memory"></i> 内存使用</div>
+                        <div class="card-icon">
+                            <span class="stat-value">70.5%</span>
+                        </div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress mem-progress" style="width: 70.5%"></div>
+                    </div>
+                    <div class="stats-container">
+                        <div class="stat-card">
+                            <div class="stat-label">总内存</div>
+                            <div class="stat-value">13.7 GB</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">已使用</div>
+                            <div class="stat-value">9.7 GB</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">可用</div>
+                            <div class="stat-value">4.0 GB</div>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="memoryChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 磁盘使用 -->
+                <div class="card card-disk">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-hdd"></i> 磁盘使用</div>
+                        <div class="card-icon">
+                            <span class="stat-value">56.9%</span>
+                        </div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress disk-progress" style="width: 56.9%"></div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="diskChart"></canvas>
+                    </div>
+                    <div class="stats-container">
+                        
+                        <div class="stat-card">
+                            <div class="stat-label">C:\</div>
+                            <div class="stat-value">56.9%</div>
+                            <div class="stat-label">529.2 / 930.6 GB</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-label">D:\</div>
+                            <div class="stat-value">24.8%</div>
+                            <div class="stat-label">29.1 / 117.2 GB</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-label">E:\</div>
+                            <div class="stat-value">85.6%</div>
+                            <div class="stat-label">0.0 / 0.0 GB</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-label">F:\</div>
+                            <div class="stat-value">73.7%</div>
+                            <div class="stat-label">175.1 / 237.7 GB</div>
+                        </div>
+                        
+                    </div>
+                </div>
+
+                <!-- 进程信息 -->
+                <div class="card card-process">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-tasks"></i> 进程资源占用</div>
+                        <div class="card-icon">
+                            <span class="stat-value">Top 10</span>
+                        </div>
+                    </div>
+                    <div class="process-list">
+                        <div class="process-item process-header">
+                            <div>PID</div>
+                            <div>进程名</div>
+                            <div>用户</div>
+                            <div>CPU</div>
+                            <div>内存</div>
+                        </div>
+                        
+                        <div class="process-item">
+                            <div>0</div>
+                            <div>System Idle Process</div>
+                            <div>NT AUTHORITY\SYSTEM</div>
+                            <div>1504.3%</div>
+                            <div>0.0%</div>
+                        </div>
+                        
+                        <div class="process-item">
+                            <div>27664</div>
+                            <div>python.exe</div>
+                            <div>XLZHEN-PC\xiong</div>
+                            <div>14.3%</div>
+                            <div>0.2%</div>
+                        </div>
+                        
+                        <div class="process-item">
+                            <div>33748</div>
+                            <div>msedgewebview2.exe</div>
+                            <div>XLZHEN-PC\xiong</div>
+                            <div>8.5%</div>
+                            <div>0.3%</div>
+                        </div>
+                        
+                        <div class="process-item">
+                            <div>6480</div>
+                            <div>msedgewebview2.exe</div>
+                            <div>XLZHEN-PC\xiong</div>
+                            <div>7.8%</div>
+                            <div>1.1%</div>
+                        </div>
+                        
+                        <div class="process-item">
+                            <div>19020</div>
+                            <div>dwm.exe</div>
+                            <div>SYSTEM</div>
+                            <div>7.3%</div>
+                            <div>0.7%</div>
+                        </div>
+                        
+                        <div class="process-item">
+                            <div>20740</div>
+                            <div>DingTalk.exe</div>
+                            <div>XLZHEN-PC\xiong</div>
+                            <div>5.5%</div>
+                            <div>1.3%</div>
+                        </div>
+                        
+                        <div class="process-item">
+                            <div>4</div>
+                            <div>System</div>
+                            <div>NT AUTHORITY\SYSTEM</div>
+                            <div>4.7%</div>
+                            <div>0.0%</div>
+                        </div>
+                        
+                        <div class="process-item">
+                            <div>6076</div>
+                            <div>pycharm64.exe</div>
+                            <div>XLZHEN-PC\xiong</div>
+                            <div>4.4%</div>
+                            <div>12.7%</div>
+                        </div>
+                        
+                        <div class="process-item">
+                            <div>5572</div>
+                            <div>MsMpEng.exe</div>
+                            <div>SYSTEM</div>
+                            <div>3.1%</div>
+                            <div>1.7%</div>
+                        </div>
+                        
+                        <div class="process-item">
+                            <div>26696</div>
+                            <div>chrome.exe</div>
+                            <div>XLZHEN-PC\xiong</div>
+                            <div>2.1%</div>
+                            <div>1.4%</div>
+                        </div>
+                        
+                    </div>
+                </div>
+
+                <!-- 网络信息 -->
+                <div class="card card-network">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-network-wired"></i> 网络流量</div>
+                        <div class="card-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                    </div>
+                    <div class="stats-container">
+                        <div class="stat-card">
+                            <div class="stat-label">发送数据</div>
+                            <div class="stat-value">1329.09 MB</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">接收数据</div>
+                            <div class="stat-value">40604.48 MB</div>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="networkChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 系统信息 -->
+                <div class="card card-system">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-info-circle"></i> 系统信息</div>
+                        <div class="card-icon">
+                            <i class="fas fa-server"></i>
+                        </div>
+                    </div>
+                    <div class="stats-container">
+                        <div class="stat-card">
+                            <div class="stat-label">处理器</div>
+                            <div class="stat-value" style="font-size:1.0rem;">AMD64</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">架构</div>
+                            <div class="stat-value">64bit</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Python版本</div>
+                            <div class="stat-value">3.10.11</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">逻辑CPU</div>
+                            <div class="stat-value">16</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">物理CPU</div>
+                            <div class="stat-value">8</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer">
+                监控数据更新时间: 2025-08-04 10:07:07 | 生成时间: 2025-08-04 10:07:12
+            </div>
+        </div>
+
+        <script>
+            // 准备图表数据
+            const timestamps = ["10:06:01", "10:06:07", "10:06:13", "10:06:19", "10:06:25", "10:06:31", "10:06:37", "10:06:43", "10:06:49", "10:06:55", "10:07:01", "10:07:07"];
+
+            // CPU使用率图表
+            const cpuCtx = document.getElementById('cpuChart').getContext('2d');
+            new Chart(cpuCtx, {
+                type: 'line',
+                data: {
+                    labels: timestamps,
+                    datasets: [
+                        {
+                            label: '总CPU使用率',
+                            data: [9.7, 3.575, 0.89375, 5.3625, 2.6812500000000004, 7.1499999999999995, 4.35625, 1.7875, 2.6812500000000004, 0.89375, 3.3499999999999996, 8.2625],
+                            borderColor: '#ff6b6b',
+                            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 100,
+                            ticks: { color: '#94a3b8', font: { size: 9 } },
+                            grid: { color: 'rgba(255,255,255,0.05)' }
+                        },
+                        x: {
+                            ticks: { color: '#94a3b8', font: { size: 9 } },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+
+            // 内存使用图表
+            const memCtx = document.getElementById('memoryChart').getContext('2d');
+            new Chart(memCtx, {
+                type: 'line',
+                data: {
+                    labels: timestamps,
+                    datasets: [
+                        {
+                            label: '内存使用率',
+                            data: [72.4, 71.0, 70.7, 70.6, 70.7, 70.5, 70.6, 70.7, 70.6, 70.4, 70.4, 70.5],
+                            borderColor: '#4dabf7',
+                            backgroundColor: 'rgba(77, 171, 247, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 100,
+                            ticks: { color: '#94a3b8', font: { size: 9 } },
+                            grid: { color: 'rgba(255,255,255,0.05)' }
+                        },
+                        x: {
+                            ticks: { color: '#94a3b8', font: { size: 9 } },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+
+            // 磁盘使用图表
+            const diskCtx = document.getElementById('diskChart').getContext('2d');
+            new Chart(diskCtx, {
+                type: 'line',
+                data: {
+                    labels: timestamps,
+                    datasets: [
+                        {
+                            label: '磁盘使用率',
+                            data: [56.9, 56.9, 56.9, 56.9, 56.9, 56.9, 56.9, 56.9, 56.9, 56.9, 56.9, 56.9],
+                            borderColor: '#51cf66',
+                            backgroundColor: 'rgba(81, 207, 102, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 100,
+                            ticks: { color: '#94a3b8', font: { size: 9 } },
+                            grid: { color: 'rgba(255,255,255,0.05)' }
+                        },
+                        x: {
+                            ticks: { color: '#94a3b8', font: { size: 9 } },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+
+            // 网络流量图表
+            const netCtx = document.getElementById('networkChart').getContext('2d');
+            new Chart(netCtx, {
+                type: 'line',
+                data: {
+                    labels: timestamps,
+                    datasets: [
+                        {
+                            label: '发送数据 (MB)',
+                            data: [1329.0708675384521, 1329.0732040405273, 1329.080418586731, 1329.0808238983154, 1329.0813674926758, 1329.0820007324219, 1329.0855693817139, 1329.0889110565186, 1329.0893297195435, 1329.0896844863892, 1329.0906076431274, 1329.0939512252808],
+                            borderColor: '#da77f2',
+                            backgroundColor: 'rgba(218, 119, 242, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: '接收数据 (MB)',
+                            data: [40604.3697385788, 40604.37318992615, 40604.38924026489, 40604.398778915405, 40604.40947818756, 40604.41846370697, 40604.434096336365, 40604.44924259186, 40604.45869541168, 40604.46749019623, 40604.47268009186, 40604.478815078735],
+                            borderColor: '#ffa94d',
+                            backgroundColor: 'rgba(255, 169, 77, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { 
+                            display: true,
+                            labels: { 
+                                color: '#e2e8f0',
+                                font: { size: 10 }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: { color: '#94a3b8', font: { size: 9 } },
+                            grid: { color: 'rgba(255,255,255,0.05)' }
+                        },
+                        x: {
+                            ticks: { color: '#94a3b8', font: { size: 9 } },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+
+            // 5秒后自动刷新页面
+            setTimeout(() => {
+                window.location.reload();
+            }, 5000);
+        </script>
+    </body>
+    </html>
+    
